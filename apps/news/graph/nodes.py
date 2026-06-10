@@ -216,8 +216,10 @@ def conflict_detect_node(state: NewsState) -> dict:
     iteration = state.get("iteration_count", 0)
     max_iter  = state.get("max_iterations", settings.NEWSBOT.get("MAX_FACT_CHECK_ITERATIONS", 2))
 
-    # 기사가 3건 미만이거나 루프 한도 초과면 스킵
-    if len(articles) < 3 or iteration >= max_iter:
+    # 루프 한도 초과면 스킵 (첫 번째 패스는 기사 수 무관하게 항상 실행)
+    if iteration >= max_iter:
+        return {"conflicts": [], "needs_fact_check": False, "iteration_count": iteration}
+    if iteration > 0 and len(articles) < 3:
         return {"conflicts": [], "needs_fact_check": False, "iteration_count": iteration}
 
     articles_text = "\n\n".join(

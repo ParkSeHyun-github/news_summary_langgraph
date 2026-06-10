@@ -12,7 +12,13 @@ from apps.news.graph.nodes import (
 
 
 def _route_after_conflict(state: NewsState) -> str:
-    if state.get("needs_fact_check") and state.get("iteration_count", 0) < state.get("max_iterations", 2):
+    iteration = state.get("iteration_count", 0)
+    max_iter  = state.get("max_iterations", 2)
+    # 첫 번째 패스는 충돌 여부와 무관하게 항상 팩트체크 실행
+    if iteration == 0:
+        return "fact_check"
+    # 이후 패스: 충돌이 남아 있고 한도 미초과 시에만 재실행
+    if state.get("needs_fact_check") and iteration < max_iter:
         return "fact_check"
     return "finalize"
 
