@@ -1,15 +1,20 @@
 """백그라운드 스레드로 그래프 실행 후 DB 저장."""
 import threading
 from django.conf import settings
+from django.db import close_old_connections
 from apps.news.models import SummaryReport, Article, ConflictRecord
 
 
 def _run(report_id: int, rss_feeds: list, pdf_paths: list, urls: list) -> None:
+    # 새 스레드에서 이전 커넥션을 닫아 SQLite 스레드 충돌 방지
+    close_old_connections()
+
     from apps.news.graph.builder import build_graph
 
     report = SummaryReport.objects.get(pk=report_id)
     report.status = SummaryReport.STATUS_RUNNING
     report.save(update_fields=["status"])
+    print(f"  [Service] report#{report_id} → 실행 중")
 
     try:
         graph = build_graph()
@@ -34,6 +39,7 @@ def _run(report_id: int, rss_feeds: list, pdf_paths: list, urls: list) -> None:
         report.fact_checked = bool(result.get("fact_check_results"))
         report.status = SummaryReport.STATUS_DONE
         report.save()
+        print(f"  [Service] report#{report_id} → 완료")
 
         Article.objects.bulk_create([
             Article(
@@ -65,10 +71,13 @@ def _run(report_id: int, rss_feeds: list, pdf_paths: list, urls: list) -> None:
             )
 
     except Exception as e:
+        print(f"  [Service] report#{report_id} → 오류: {e}")
         report.status = SummaryReport.STATUS_ERROR
         report.error_message = str(e)
         report.save(update_fields=["status", "error_message"])
         raise
+    finally:
+        close_old_connections()
 
 
 def run_newsbot_async(report_id: int, rss_feeds: list, pdf_paths: list, urls: list) -> None:

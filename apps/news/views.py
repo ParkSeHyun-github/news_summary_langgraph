@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
+from django.db import close_old_connections
 
 from .forms import NewsBotForm
 from .models import SummaryReport
@@ -40,6 +41,8 @@ def loading(request, pk: int):
 
 @require_GET
 def status_json(request, pk: int):
+    # 백그라운드 스레드 DB 쓰기가 이 커넥션에도 보이도록 갱신
+    close_old_connections()
     report = get_object_or_404(SummaryReport, pk=pk)
     return JsonResponse({
         "status": report.status,

@@ -57,6 +57,16 @@
 .pipeline-step.active .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .pipeline-step.done   { color: var(--muted2); }
 .pipeline-step.done   .dot { background: var(--green); }
+
+.status-tag {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 99px;
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  margin-top: 0.25rem;
+}
 {% endblock %}
 
 {% block content %}
@@ -65,6 +75,7 @@
   <div>
     <div class="loading-title">{{ report.query }}</div>
     <div class="loading-sub">멀티소스 수집 · 충돌 감지 · 팩트체크 진행 중</div>
+    <div class="status-tag" id="status-label">상태 확인 중…</div>
   </div>
 
   <div class="pipeline">
@@ -80,6 +91,9 @@
 const POLL_URL = "{% url 'news:status_json' report.pk %}";
 const steps = ["s1","s2","s3","s4","s5"];
 let current = 0;
+// 로딩 페이지가 보여진 시각을 기록 (최소 3초는 표시)
+const shownAt = Date.now();
+const MIN_DISPLAY_MS = 3000;
 
 function advance() {
   if (current > 0) document.getElementById(steps[current-1]).className = "pipeline-step done";
@@ -89,15 +103,42 @@ function advance() {
   }
 }
 advance();
-const timer = setInterval(advance, 5000);
+const stepTimer = setInterval(advance, 5000);
+
+const STATUS_LABELS = {
+  "pending": "대기 중…",
+  "running": "분석 진행 중…",
+  "done":    "분석 완료 — 결과 페이지로 이동합니다",
+  "error":   "오류 발생",
+};
 
 async function poll() {
   try {
     const data = await fetch(POLL_URL).then(r => r.json());
-    if (data.status === "done")  { clearInterval(timer); window.location.href = data.redirect; }
-    if (data.status === "error") { clearInterval(timer); window.location.reload(); }
-  } catch(e) {}
+    const label = document.getElementById("status-label");
+    if (label) label.textContent = STATUS_LABELS[data.status] || data.status;
+
+    if (data.status === "done") {
+      clearInterval(stepTimer);
+      clearInterval(pollTimer);
+      // 최소 3초 표시 보장
+      const elapsed = Date.now() - shownAt;
+      const delay = Math.max(0, MIN_DISPLAY_MS - elapsed);
+      // 남은 파이프라인 스텝 모두 완료 표시
+      while (current <= steps.length) advance();
+      setTimeout(() => { window.location.href = data.redirect; }, delay);
+    }
+    if (data.status === "error") {
+      clearInterval(stepTimer);
+      clearInterval(pollTimer);
+      setTimeout(() => { window.location.reload(); }, 1500);
+    }
+  } catch(e) {
+    console.warn("poll error:", e);
+  }
 }
-setInterval(poll, 2000);
+const pollTimer = setInterval(poll, 2000);
+// 첫 폴링을 즉시 실행
+poll();
 </script>
 {% endblock %}
