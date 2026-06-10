@@ -52,9 +52,10 @@
 </div>
 
 <div class="card" style="padding: 1rem 1.5rem;">
-  <div class="conf-label">신뢰도 {{ report.confidence_score|floatformat:2 }}</div>
+  <div class="conf-label">신뢰도 {{ report.confidence_score|floatformat:2 }} / 1.0</div>
   <div class="conf-bar">
-    <div class="conf-fill" style="width:{{ report.confidence_score|floatformat:0 }}%"></div>
+    {% widthratio report.confidence_score 1 100 as pct %}
+    <div class="conf-fill" style="width:{{ pct }}%"></div>
   </div>
 </div>
 
