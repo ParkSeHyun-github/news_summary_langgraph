@@ -3,10 +3,11 @@ LangGraph 노드 함수.
 django.conf.settings 에서 설정을 읽으므로 DJANGO_SETTINGS_MODULE 이 설정된 후 임포트해야 합니다.
 """
 import json
-import os
+import time
+import re
 from django.conf import settings
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from apps.news.sources.rss import fetch_rss
 from apps.news.sources.pdf import fetch_pdf
@@ -25,7 +26,7 @@ def get_llm() -> BaseChatModel:
         if provider == "groq":
             from langchain_groq import ChatGroq
             _llm = ChatGroq(
-                model=settings.NEWSBOT.get("LLM_MODEL", "llama-3.1-8b-instant"),
+                model=settings.NEWSBOT.get("LLM_MODEL", "llama-3.3-70b-versatile"),
                 temperature=0,
             )
         elif provider == "ollama":
@@ -41,6 +42,24 @@ def get_llm() -> BaseChatModel:
                 temperature=0,
             )
     return _llm
+
+
+def llm_invoke(messages: list[BaseMessage], max_retries: int = 4) -> BaseMessage:
+    """Rate limit 발생 시 자동 재시도 (최대 4회, 지수 백오프)."""
+    for attempt in range(max_retries):
+        try:
+            return get_llm().invoke(messages)
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "rate_limit" in err.lower() or "rate limit" in err.lower():
+                # 에러 메시지에서 대기 시간 파싱 (없으면 기본값 사용)
+                wait_match = re.search(r"try again in ([\d.]+)s", err)
+                wait = float(wait_match.group(1)) + 1 if wait_match else (2 ** attempt) * 5
+                print(f"  [LLM] Rate limit — {wait:.0f}초 후 재시도 ({attempt+1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                raise
+    return get_llm().invoke(messages)
 
 
 # ── 병렬 페치 노드 ────────────────────────────────────────────
@@ -144,7 +163,7 @@ def summarize_node(state: NewsState) -> dict:
         for i, a in enumerate(articles[:15])
     )
 
-    response = get_llm().invoke([
+    response = llm_invoke([
         SystemMessage(content=(
             "당신은 전문 뉴스 분석가입니다. "
             "반드시 주어진 주제와 직접 관련된 내용만 요약하세요. "
@@ -206,7 +225,7 @@ def conflict_detect_node(state: NewsState) -> dict:
         for i, a in enumerate(articles[:10])
     )
 
-    response = get_llm().invoke([
+    response = llm_invoke([
         SystemMessage(content=(
             "당신은 팩트체커입니다. 반드시 JSON만 반환하고 다른 텍스트는 쓰지 마세요."
         )),
@@ -260,7 +279,7 @@ def fact_check_node(state: NewsState) -> dict:
             f"아래 요약의 주요 사실들이 수집된 기사와 일치하는지 검증하세요:\n{summary[:800]}"
         )
 
-    response = get_llm().invoke([
+    response = llm_invoke([
         SystemMessage(content="팩트체커입니다. 반드시 JSON 배열만 반환하세요."),
         HumanMessage(content=(
             f"{check_target}\n\n"
@@ -302,7 +321,7 @@ def finalize_node(state: NewsState) -> dict:
         for r in fact_results
     )
 
-    response = get_llm().invoke([
+    response = llm_invoke([
         SystemMessage(content="팩트체크 결과를 반영해 최종 요약을 작성합니다."),
         HumanMessage(content=(
             f"초벌 요약:\n{summary}\n\n팩트체크 결과:\n{fact_text}\n\n"
