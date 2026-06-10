@@ -1,0 +1,49 @@
+{% extends "news/base.html" %}
+{% block title %}보고서 목록{% endblock %}
+
+{% block extra_style %}
+.page-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1.25rem; }
+{% endblock %}
+
+{% block content %}
+<div class="page-title">보고서 목록</div>
+
+<div class="card">
+  {% if reports %}
+  <table>
+    <thead>
+      <tr>
+        <th>주제</th>
+        <th>상태</th>
+        <th>신뢰도</th>
+        <th>팩트체크</th>
+        <th>생성일</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in reports %}
+    <tr>
+      <td>
+        {% if r.status == "done" %}
+          <a href="{% url 'news:result' r.pk %}">{{ r.query }}</a>
+        {% elif r.status == "running" or r.status == "pending" %}
+          <a href="{% url 'news:loading' r.pk %}">{{ r.query }}</a>
+        {% else %}
+          {{ r.query }}
+        {% endif %}
+      </td>
+      <td><span class="badge badge-{{ r.status }}">{{ r.get_status_display }}</span></td>
+      <td>{{ r.confidence_score|floatformat:2 }}</td>
+      <td style="color:{% if r.fact_checked %}var(--green){% else %}var(--muted){% endif %}">
+        {% if r.fact_checked %}✓{% else %}—{% endif %}
+      </td>
+      <td>{{ r.created_at|date:"m-d H:i" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">아직 보고서가 없습니다. <a href="/" style="color:var(--accent2)">검색 시작하기 →</a></p>
+  {% endif %}
+</div>
+{% endblock %}

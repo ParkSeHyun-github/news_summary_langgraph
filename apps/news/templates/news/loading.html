@@ -1,0 +1,103 @@
+{% extends "news/base.html" %}
+{% block title %}분석 중…{% endblock %}
+
+{% block extra_style %}
+.loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: 1rem;
+}
+.spinner-ring {
+  width: 48px; height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-title { font-size: 1.3rem; font-weight: 700; margin-top: 0.5rem; }
+.loading-sub   { font-size: 0.85rem; color: var(--muted); }
+
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 340px;
+}
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: all 0.3s;
+}
+.pipeline-step .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.pipeline-step.active {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surface2);
+}
+.pipeline-step.active .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.pipeline-step.done   { color: var(--muted2); }
+.pipeline-step.done   .dot { background: var(--green); }
+{% endblock %}
+
+{% block content %}
+<div class="loading-wrap">
+  <div class="spinner-ring"></div>
+  <div>
+    <div class="loading-title">{{ report.query }}</div>
+    <div class="loading-sub">멀티소스 수집 · 충돌 감지 · 팩트체크 진행 중</div>
+  </div>
+
+  <div class="pipeline">
+    <div class="pipeline-step" id="s1"><span class="dot"></span>RSS · 검색 · URL 병렬 수집</div>
+    <div class="pipeline-step" id="s2"><span class="dot"></span>기사 집계 및 관련성 필터링</div>
+    <div class="pipeline-step" id="s3"><span class="dot"></span>초벌 요약 생성</div>
+    <div class="pipeline-step" id="s4"><span class="dot"></span>충돌 감지 분석</div>
+    <div class="pipeline-step" id="s5"><span class="dot"></span>팩트체크 및 최종 요약</div>
+  </div>
+</div>
+
+<script>
+const POLL_URL = "{% url 'news:status_json' report.pk %}";
+const steps = ["s1","s2","s3","s4","s5"];
+let current = 0;
+
+function advance() {
+  if (current > 0) document.getElementById(steps[current-1]).className = "pipeline-step done";
+  if (current < steps.length) {
+    document.getElementById(steps[current]).className = "pipeline-step active";
+    current++;
+  }
+}
+advance();
+const timer = setInterval(advance, 5000);
+
+async function poll() {
+  try {
+    const data = await fetch(POLL_URL).then(r => r.json());
+    if (data.status === "done")  { clearInterval(timer); window.location.href = data.redirect; }
+    if (data.status === "error") { clearInterval(timer); window.location.reload(); }
+  } catch(e) {}
+}
+setInterval(poll, 2000);
+</script>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "news/base.html" %}
+{% block title %}뉴스 요약봇{% endblock %}
+
+{% block extra_style %}
+.hero {
+  text-align: center;
+  padding: 3.5rem 0 2.5rem;
+}
+.hero h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.5rem;
+}
+.hero p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.hero-chips {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+.hero-chip {
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 0.25rem 0.7rem;
+}
+
+.form-wrap { max-width: 600px; margin: 0 auto; }
+
+.input-row { position: relative; margin-bottom: 0.75rem; }
+.input-row input[type="text"] {
+  font-size: 1rem;
+  padding: 0.85rem 7rem 0.85rem 1rem;
+  border-radius: 10px;
+}
+.input-row .submit-inline {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+details { margin-top: 0.5rem; }
+details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.4rem 0;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+details summary::before { content: "›"; transition: transform 0.2s; display: inline-block; }
+details[open] summary::before { transform: rotate(90deg); }
+details summary:hover { color: var(--muted2); }
+.extra-fields { padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5rem 0 1.5rem;
+}
+
+.recent-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.75rem;
+}
+.recent-list { display: flex; flex-direction: column; }
+.recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+  gap: 1rem;
+}
+.recent-item:last-child { border-bottom: none; }
+.recent-query {
+  font-size: 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-query:hover { color: var(--accent2); }
+.recent-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <h1>멀티소스 뉴스 요약</h1>
+  <p>RSS · 웹 · PDF를 동시에 수집하고 충돌을 감지해 팩트체크합니다</p>
+  <div class="hero-chips">
+    <span class="hero-chip">⚡ 병렬 수집</span>
+    <span class="hero-chip">🔍 충돌 감지</span>
+    <span class="hero-chip">✅ 팩트체크</span>
+    <span class="hero-chip">📊 신뢰도 분석</span>
+  </div>
+</div>
+
+<div class="form-wrap">
+  <form method="post">
+    {% csrf_token %}
+    <div class="input-row">
+      {{ form.query }}
+      <button type="submit" class="btn btn-primary submit-inline">요약 →</button>
+    </div>
+
+    <details>
+      <summary>소스 직접 지정</summary>
+      <div class="extra-fields">
+        <div>
+          <label>RSS 피드 URL (줄바꿈으로 구분)</label>
+          {{ form.rss_feeds }}
+        </div>
+        <div>
+          <label>크롤링 URL (줄바꿈으로 구분)</label>
+          {{ form.urls }}
+        </div>
+      </div>
+    </details>
+  </form>
+
+  {% if recent %}
+  <hr class="divider">
+  <div class="recent-header">최근 보고서</div>
+  <div class="recent-list">
+    {% for r in recent %}
+    <div class="recent-item">
+      <a class="recent-query" href="{% url 'news:result' r.pk %}">{{ r.query }}</a>
+      <div class="recent-meta">
+        <span>신뢰도 {{ r.confidence_score|floatformat:2 }}</span>
+        <span>{{ r.created_at|date:"m/d H:i" }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+.env
+*.log
+graph.png
+graph.mmd
+summary_output.txt
+.claude/
